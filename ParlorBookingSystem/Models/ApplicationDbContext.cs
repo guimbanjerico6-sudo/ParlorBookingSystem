@@ -1,16 +1,18 @@
 ﻿using Microsoft.EntityFrameworkCore;
+using ParlorBookingSystem.Models; // Make sure this using statement is at the top!
 
-namespace ParlorBookingSystem.Models
+namespace ParlorBookingSystem.Data // Your namespace might be slightly different, that is okay
 {
-    // Inheriting from DbContext gives this class its translation powers
     public class ApplicationDbContext : DbContext
     {
-        public ApplicationDbContext(DbContextOptions<ApplicationDbContext> options) : base(options)
+        public ApplicationDbContext(DbContextOptions<ApplicationDbContext> options)
+            : base(options)
         {
         }
 
-        // These DbSets are the actual tables that will be created in your database
-        public DbSet<Customer> Customers { get; set; }
+        // These three lines are the crucial part!
+        // They tell EF Core to turn our C# Models into SQL Tables.
+        public DbSet<User> Users { get; set; }
         public DbSet<Service> Services { get; set; }
         public DbSet<Appointment> Appointments { get; set; }
     }
