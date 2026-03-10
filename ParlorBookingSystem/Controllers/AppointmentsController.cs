@@ -11,10 +11,12 @@ namespace ParlorBookingSystem.Controllers
     {
         // We ONLY inject the Service layer here. No more _context!
         private readonly IAppointmentService _appointmentService;
+        private readonly IEmailService _emailService;
 
-        public AppointmentsController(IAppointmentService appointmentService)
+        public AppointmentsController(IAppointmentService appointmentService, IEmailService emailService)
         {
             _appointmentService = appointmentService;
+            _emailService = emailService;
         }
 
         // --- 1. THE CUSTOMER SIDE: Request an Appointment ---
@@ -80,17 +82,32 @@ namespace ParlorBookingSystem.Controllers
             return Ok(appointments);
         }
 
-        // --- 4. THE AUNTIE SIDE: Accept an Appointment ---
         // PUT: api/Appointments/5/confirm
         [HttpPut("{id}/confirm")]
         public async Task<IActionResult> ConfirmAppointment(int id)
         {
             try
             {
+                // 1. Lock it in the database
                 var confirmedAppointment = await _appointmentService.ConfirmAppointmentAsync(id);
+
+                // 2. Draft the automated email
+                string targetEmail = "YOUR_PERSONAL_EMAIL_HERE@gmail.com"; // Put your email here for testing!
+                string subject = "Appointment Confirmed - Auntie's Parlor";
+
+                // We can even use HTML to make it look professional!
+                string body = $@"
+                    <h2>Good News!</h2>
+                    <p>Auntie has successfully received your deposit.</p>
+                    <p>Your appointment for <strong>{confirmedAppointment.RequestedStartTime:f}</strong> is officially locked in.</p>
+                    <p>See you soon!</p>";
+
+                // 3. Fire the email!
+                await _emailService.SendEmailAsync(targetEmail, subject, body);
+
                 return Ok(new
                 {
-                    Message = "Appointment officially CONFIRMED! The Bouncer is now protecting this slot permanently.",
+                    Message = "Appointment CONFIRMED and Email Sent successfully!",
                     Appointment = confirmedAppointment
                 });
             }
