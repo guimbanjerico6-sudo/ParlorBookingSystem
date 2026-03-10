@@ -1,5 +1,5 @@
 ﻿using Microsoft.AspNetCore.Mvc;
-using Microsoft.AspNetCore.Http; // Needed for IFormFile
+using Microsoft.AspNetCore.Http;
 using ParlorBookingSystem.Models;
 using ParlorBookingSystem.Services;
 
@@ -9,7 +9,7 @@ namespace ParlorBookingSystem.Controllers
     [ApiController]
     public class AppointmentsController : ControllerBase
     {
-        // We ONLY inject the Service layer here. No more _context!
+        // Notice: We ONLY inject the Service layers here. No _context allowed!
         private readonly IAppointmentService _appointmentService;
         private readonly IEmailService _emailService;
 
@@ -19,60 +19,85 @@ namespace ParlorBookingSystem.Controllers
             _emailService = emailService;
         }
 
-        // --- 1. THE CUSTOMER SIDE: Request an Appointment ---
+        // --- 1. THE CUSTOMER SIDE: Book a Slot ---
+        // POST: api/Appointments
         [HttpPost]
-        public async Task<IActionResult> CreateAppointment([FromBody] Appointment appointmentRequest)
+        public async Task<IActionResult> CreateAppointment([FromBody] Appointment appointment)
         {
             try
             {
-                // Look how beautifully clean this is now! 
-                // The Bouncer math, the Buffer Time, and the Database saves are ALL handled by the Service.
-                var createdAppointment = await _appointmentService.CreateAppointmentAsync(appointmentRequest);
-
-                return Ok(new
-                {
-                    Message = "Appointment requested successfully! Pending Auntie's deposit verification.",
-                    Appointment = createdAppointment
-                });
+                var newAppointment = await _appointmentService.CreateAppointmentAsync(appointment);
+                return Ok(newAppointment);
             }
             catch (Exception ex)
             {
-                // If the Bouncer finds a clash, the Service throws an error, and we catch it here.
                 return BadRequest(new { Error = ex.Message });
             }
         }
 
-            // 3. THE BOUNCER: Check for overlaps ONLY with "Confirmed" appointments
-            // This logic checks if the new time starts before another ends, 
-            // AND ends after another starts.
-            bool isClashing = await _context.Appointments.AnyAsync(a =>
-                a.Status == "Confirmed" &&
-                appointment.RequestedStartTime < a.EstimatedEndTime &&
-                appointment.EstimatedEndTime > a.RequestedStartTime);
-
-            if (isClashing)
+        // --- 2. THE CUSTOMER SIDE: Upload GCash Receipt ---
+        // POST: api/Appointments/5/receipt
+        [HttpPost("{id}/receipt")]
+        public async Task<IActionResult> UploadReceipt(int id, IFormFile file)
+        {
+            try
             {
-                return BadRequest("Sorry, Auntie is already booked for a confirmed service at this time.");
+                var updatedAppointment = await _appointmentService.UploadReceiptAsync(id, file);
+                return Ok(new
+                {
+                    Message = "Receipt uploaded successfully!",
+                    Appointment = updatedAppointment
+                });
             }
-
-            // 4. Set default status to "Pending" so Auntie can review her errands
-            appointment.Status = "Pending";
-
-            _context.Appointments.Add(appointment);
-            await _context.SaveChangesAsync();
-
-            return Ok(appointment);
+            catch (Exception ex)
+            {
+                return BadRequest(new { Error = ex.Message });
+            }
         }
 
-        // --- THE AUNTIE SIDE: Get all Pending requests for her Inbox ---
-        [HttpGet("pending")]
-        public async Task<ActionResult<IEnumerable<Appointment>>> GetPendingAppointments()
+        // --- 3. THE AUNTIE SIDE: View Inbox ---
+        // GET: api/Appointments/review
+        [HttpGet("review")]
+        public async Task<IActionResult> GetAppointmentsForReview()
         {
-            return await _context.Appointments
-                .Include(a => a.Service)
-                .Include(a => a.Customer)
-                .Where(a => a.Status == "Pending")
-                .ToListAsync();
+            var appointments = await _appointmentService.GetAppointmentsForReviewAsync();
+            return Ok(appointments);
+        }
+
+        // --- 4. THE AUNTIE SIDE: Accept an Appointment ---
+        // PUT: api/Appointments/5/confirm
+        [HttpPut("{id}/confirm")]
+        public async Task<IActionResult> ConfirmAppointment(int id)
+        {
+            try
+            {
+                // 1. Lock it in the database
+                var confirmedAppointment = await _appointmentService.ConfirmAppointmentAsync(id);
+
+                // 2. Draft the automated email
+                // IMPORTANT: Put your actual email here for testing!
+                string targetEmail = "YOUR_PERSONAL_EMAIL_HERE@gmail.com";
+                string subject = "Appointment Confirmed - Auntie's Parlor";
+
+                string body = $@"
+                    <h2>Good News!</h2>
+                    <p>Auntie has successfully received your deposit.</p>
+                    <p>Your appointment for <strong>{confirmedAppointment.RequestedStartTime:f}</strong> is officially locked in.</p>
+                    <p>See you soon!</p>";
+
+                // 3. Fire the email
+                await _emailService.SendEmailAsync(targetEmail, subject, body);
+
+                return Ok(new
+                {
+                    Message = "Appointment CONFIRMED and Email Sent successfully!",
+                    Appointment = confirmedAppointment
+                });
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(new { Error = ex.Message });
+            }
         }
     }
 }
