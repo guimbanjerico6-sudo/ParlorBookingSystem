@@ -1,6 +1,7 @@
 ﻿using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore;
+using Microsoft.AspNetCore.Http; // Needed for IFormFile
 using ParlorBookingSystem.Models;
+using ParlorBookingSystem.Services;
 
 namespace ParlorBookingSystem.Controllers
 {
@@ -8,55 +9,95 @@ namespace ParlorBookingSystem.Controllers
     [ApiController]
     public class AppointmentsController : ControllerBase
     {
-        private readonly ApplicationDbContext _context;
+        // We ONLY inject the Service layer here. No more _context!
+        private readonly IAppointmentService _appointmentService;
 
-        public AppointmentsController(ApplicationDbContext context)
+        public AppointmentsController(IAppointmentService appointmentService)
         {
-            _context = context;
+            _appointmentService = appointmentService;
         }
 
-        // --- THE CUSTOMER SIDE: Request an Appointment ---
+        // --- 1. THE CUSTOMER SIDE: Request an Appointment ---
         [HttpPost]
-        public async Task<ActionResult<Appointment>> PostAppointment(Appointment appointment)
+        public async Task<IActionResult> CreateAppointment([FromBody] Appointment appointmentRequest)
         {
-            // 1. Find the service to get its duration (e.g., 45 mins)
-            var service = await _context.Services.FindAsync(appointment.ServiceId);
-            if (service == null) return BadRequest("Service not found.");
-
-            // 2. Automatically calculate the end time based on the service duration
-            appointment.EstimatedEndTime = appointment.RequestedStartTime.AddMinutes(service.DurationMinutes);
-
-            // 3. THE BOUNCER: Check for overlaps ONLY with "Confirmed" appointments
-            // This logic checks if the new time starts before another ends, 
-            // AND ends after another starts.
-            bool isClashing = await _context.Appointments.AnyAsync(a =>
-                a.Status == "Confirmed" &&
-                appointment.RequestedStartTime < a.EstimatedEndTime &&
-                appointment.EstimatedEndTime > a.RequestedStartTime);
-
-            if (isClashing)
+            try
             {
-                return BadRequest("Sorry, Auntie is already booked for a confirmed service at this time.");
+                // Look how beautifully clean this is now! 
+                // The Bouncer math, the Buffer Time, and the Database saves are ALL handled by the Service.
+                var createdAppointment = await _appointmentService.CreateAppointmentAsync(appointmentRequest);
+
+                return Ok(new
+                {
+                    Message = "Appointment requested successfully! Pending Auntie's deposit verification.",
+                    Appointment = createdAppointment
+                });
             }
-
-            // 4. Set default status to "Pending" so Auntie can review her errands
-            appointment.Status = "Pending";
-
-            _context.Appointments.Add(appointment);
-            await _context.SaveChangesAsync();
-
-            return Ok(appointment);
+            catch (Exception ex)
+            {
+                // If the Bouncer finds a clash, the Service throws an error, and we catch it here.
+                return BadRequest(new { Error = ex.Message });
+            }
         }
 
-        // --- THE AUNTIE SIDE: Get all Pending requests for her Inbox ---
-        [HttpGet("pending")]
-        public async Task<ActionResult<IEnumerable<Appointment>>> GetPendingAppointments()
+        // --- 2. THE CUSTOMER SIDE: Upload Deposit Receipt ---
+        [HttpPost("{id}/receipt")]
+        public async Task<IActionResult> UploadReceipt(int id, IFormFile file)
         {
-            return await _context.Appointments
-                .Include(a => a.Service)
-                .Include(a => a.Customer)
-                .Where(a => a.Status == "Pending")
-                .ToListAsync();
+            try
+            {
+                var fileUrl = await _appointmentService.UploadReceiptAsync(id, file);
+
+                return Ok(new
+                {
+                    Message = "Receipt uploaded successfully!",
+                    ImageUrl = fileUrl
+                });
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(new { Error = ex.Message });
+            }
+        }
+
+        /* * ========================================================
+         * COMING SOON: AUNTIE'S DASHBOARD (Option 2 on our Sprint)
+         * We will rebuild these the N-Tier way next!
+         * ========================================================
+         *
+         * [HttpGet("pending")]
+         * public async Task<IActionResult> GetPendingAppointments() { ... }
+         * * [HttpPut("confirm/{id}")]
+         * public async Task<IActionResult> ConfirmAppointment(int id) { ... }
+         */
+
+        // --- 3. THE AUNTIE SIDE: View Inbox ---
+        // GET: api/Appointments/review
+        [HttpGet("review")]
+        public async Task<IActionResult> GetAppointmentsForReview()
+        {
+            var appointments = await _appointmentService.GetAppointmentsForReviewAsync();
+            return Ok(appointments);
+        }
+
+        // --- 4. THE AUNTIE SIDE: Accept an Appointment ---
+        // PUT: api/Appointments/5/confirm
+        [HttpPut("{id}/confirm")]
+        public async Task<IActionResult> ConfirmAppointment(int id)
+        {
+            try
+            {
+                var confirmedAppointment = await _appointmentService.ConfirmAppointmentAsync(id);
+                return Ok(new
+                {
+                    Message = "Appointment officially CONFIRMED! The Bouncer is now protecting this slot permanently.",
+                    Appointment = confirmedAppointment
+                });
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(new { Error = ex.Message });
+            }
         }
     }
 }

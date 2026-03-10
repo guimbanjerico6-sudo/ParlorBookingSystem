@@ -1,5 +1,6 @@
 ﻿using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using ParlorBookingSystem.Data;
 using ParlorBookingSystem.Models;
 
 namespace ParlorBookingSystem.Controllers

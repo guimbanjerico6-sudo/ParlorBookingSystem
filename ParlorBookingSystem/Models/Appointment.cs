@@ -1,34 +1,25 @@
-﻿namespace ParlorBookingSystem.Models
+﻿using System;
+
+namespace ParlorBookingSystem.Models
 {
     public class Appointment
     {
         public int Id { get; set; }
-
-        // --- FOREIGN KEYS ---
         public int CustomerId { get; set; }
-        public Customer? Customer { get; set; }
-
         public int ServiceId { get; set; }
-        public Service? Service { get; set; }
-
-        // --- TIME ---
         public DateTime RequestedStartTime { get; set; }
-        public DateTime EstimatedEndTime { get; set; } // Calculated later using Service.DurationMinutes
+        public DateTime EstimatedEndTime { get; set; }
 
-        // Optional notes from the customer (e.g., "Thick hair")
-        public string? SpecialNotes { get; set; }
+        // 1. Changed default from "Pending" to "Awaiting Payment"
+        public string Status { get; set; } = "Awaiting Payment";
 
-        // --- THE INBOX STATE MACHINE ---
-        // Allowed values: "Pending", "Awaiting Payment", "Confirmed", "Completed", "Declined"
-        public string Status { get; set; } = "Pending";
+        public string? ReceiptImageUrl { get; set; }
 
-        // --- THE MONEY TRACKER ---
-        // Allowed values: "Unpaid", "Deposit Paid", "Fully Paid"
-        public string PaymentStatus { get; set; } = "Unpaid";
+        // 2. THE TIMER: Records the exact moment the appointment is placed
+        public DateTime CreatedAt { get; set; } = DateTime.Now;
 
-        public decimal AmountPaid { get; set; } = 0;
-
-        // Nullable (?) because they don't have a GCash receipt number when they first request it
-        public string? PaymentReferenceId { get; set; }
+        // Navigation Properties
+        public User? Customer { get; set; }
+        public Service? Service { get; set; }
     }
 }

@@ -1,14 +1,24 @@
 using Microsoft.EntityFrameworkCore;
+using ParlorBookingSystem.Data;
 using ParlorBookingSystem.Models;
+using ParlorBookingSystem.Repositories;
+using ParlorBookingSystem.Services;
 
 var builder = WebApplication.CreateBuilder(args);
 
 // Tells the app to use SQL Server and grab the password/location from appsettings.json
 builder.Services.AddDbContext<ApplicationDbContext>(options =>
     options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection")));
+builder.Services.AddScoped<IAppointmentRepository, AppointmentRepository>();
+builder.Services.AddScoped<IAppointmentService, AppointmentService>();
 
 // Add services to the container.
-builder.Services.AddControllers();
+builder.Services.AddControllers()
+    .AddJsonOptions(options =>
+    {
+        // This tells the API: "If you see a loop, just ignore it and stop."
+        options.JsonSerializerOptions.ReferenceHandler = System.Text.Json.Serialization.ReferenceHandler.IgnoreCycles;
+    });
 
 // --- 1. THE SWAGGER FIX ---
 builder.Services.AddEndpointsApiExplorer();
@@ -26,6 +36,7 @@ if (app.Environment.IsDevelopment())
 
 app.UseHttpsRedirection();
 app.UseAuthorization();
+app.UseStaticFiles();
 app.MapControllers();
 
 // --- SEED DATABASE ON STARTUP ---

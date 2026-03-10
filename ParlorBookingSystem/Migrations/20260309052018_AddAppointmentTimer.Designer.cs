@@ -6,15 +6,14 @@ using Microsoft.EntityFrameworkCore.Metadata;
 using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using ParlorBookingSystem.Data;
-using ParlorBookingSystem.Models;
 
 #nullable disable
 
 namespace ParlorBookingSystem.Migrations
 {
     [DbContext(typeof(ApplicationDbContext))]
-    [Migration("20260227120036_InitialCreate")]
-    partial class InitialCreate
+    [Migration("20260309052018_AddAppointmentTimer")]
+    partial class AddAppointmentTimer
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
@@ -34,8 +33,8 @@ namespace ParlorBookingSystem.Migrations
 
                     SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
 
-                    b.Property<decimal>("AmountPaid")
-                        .HasColumnType("decimal(18,2)");
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
 
                     b.Property<int>("CustomerId")
                         .HasColumnType("int");
@@ -43,11 +42,7 @@ namespace ParlorBookingSystem.Migrations
                     b.Property<DateTime>("EstimatedEndTime")
                         .HasColumnType("datetime2");
 
-                    b.Property<string>("PaymentReferenceId")
-                        .HasColumnType("nvarchar(max)");
-
-                    b.Property<string>("PaymentStatus")
-                        .IsRequired()
+                    b.Property<string>("ReceiptImageUrl")
                         .HasColumnType("nvarchar(max)");
 
                     b.Property<DateTime>("RequestedStartTime")
@@ -55,9 +50,6 @@ namespace ParlorBookingSystem.Migrations
 
                     b.Property<int>("ServiceId")
                         .HasColumnType("int");
-
-                    b.Property<string>("SpecialNotes")
-                        .HasColumnType("nvarchar(max)");
 
                     b.Property<string>("Status")
                         .IsRequired()
@@ -72,31 +64,6 @@ namespace ParlorBookingSystem.Migrations
                     b.ToTable("Appointments");
                 });
 
-            modelBuilder.Entity("ParlorBookingSystem.Models.Customer", b =>
-                {
-                    b.Property<int>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("int");
-
-                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
-
-                    b.Property<string>("MessengerLink")
-                        .IsRequired()
-                        .HasColumnType("nvarchar(max)");
-
-                    b.Property<string>("Name")
-                        .IsRequired()
-                        .HasColumnType("nvarchar(max)");
-
-                    b.Property<string>("PhoneNumber")
-                        .IsRequired()
-                        .HasColumnType("nvarchar(max)");
-
-                    b.HasKey("Id");
-
-                    b.ToTable("Customers");
-                });
-
             modelBuilder.Entity("ParlorBookingSystem.Models.Service", b =>
                 {
                     b.Property<int>("Id")
@@ -104,6 +71,13 @@ namespace ParlorBookingSystem.Migrations
                         .HasColumnType("int");
 
                     SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<int>("BufferTimeMinutes")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Description")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
 
                     b.Property<int>("DurationMinutes")
                         .HasColumnType("int");
@@ -120,9 +94,41 @@ namespace ParlorBookingSystem.Migrations
                     b.ToTable("Services");
                 });
 
+            modelBuilder.Entity("ParlorBookingSystem.Models.User", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("Email")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("FullName")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("PasswordHash")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("Role")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("Users");
+                });
+
             modelBuilder.Entity("ParlorBookingSystem.Models.Appointment", b =>
                 {
-                    b.HasOne("ParlorBookingSystem.Models.Customer", "Customer")
+                    b.HasOne("ParlorBookingSystem.Models.User", "Customer")
                         .WithMany("Appointments")
                         .HasForeignKey("CustomerId")
                         .OnDelete(DeleteBehavior.Cascade)
@@ -139,12 +145,12 @@ namespace ParlorBookingSystem.Migrations
                     b.Navigation("Service");
                 });
 
-            modelBuilder.Entity("ParlorBookingSystem.Models.Customer", b =>
+            modelBuilder.Entity("ParlorBookingSystem.Models.Service", b =>
                 {
                     b.Navigation("Appointments");
                 });
 
-            modelBuilder.Entity("ParlorBookingSystem.Models.Service", b =>
+            modelBuilder.Entity("ParlorBookingSystem.Models.User", b =>
                 {
                     b.Navigation("Appointments");
                 });

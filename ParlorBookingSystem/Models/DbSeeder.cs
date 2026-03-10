@@ -1,4 +1,5 @@
 ﻿using Microsoft.EntityFrameworkCore;
+using ParlorBookingSystem.Data;
 
 namespace ParlorBookingSystem.Models
 {
@@ -26,13 +27,13 @@ namespace ParlorBookingSystem.Models
             context.Services.AddRange(services);
 
             // 3. Inject a Fake Customer
-            var customer = new Customer
+            var customer = new User
             {
-                Name = "Maria Clara",
-                PhoneNumber = "0917-123-4567",
-                MessengerLink = "m.me/mariaclara"
+                FullName = "Maria Clara",
+                Email = "mariaclara@gmail.com" // We use Email now for those automated notifications!
             };
-            context.Customers.Add(customer);
+
+            context.Users.Add(customer); // Changed from .Customers to .Users
 
             // 4. Hit "Save" to push them to SQL
             context.SaveChanges();
