@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Hosting;
 using ParlorBookingSystem.Models;
 using ParlorBookingSystem.Repositories;
 using ParlorBookingSystem.Data;
+using Microsoft.EntityFrameworkCore;
 
 namespace ParlorBookingSystem.Services
 {
@@ -19,23 +20,40 @@ namespace ParlorBookingSystem.Services
             _env = env;
         }
 
-        public async Task<Appointment> CreateAppointmentAsync(Appointment appointment)
+        public async Task<Appointment> CreateAppointmentAsync(Appointment newAppointment)
         {
-            var parlorService = await _context.Services.FindAsync(appointment.ServiceId);
-            if (parlorService == null) throw new Exception("Service not found.");
+            // 1. Define the "Lock" Timer (15 minutes ago)
+            var expirationTime = DateTime.Now.AddMinutes(-15);
 
-            int totalMinutes = parlorService.DurationMinutes + parlorService.BufferTimeMinutes;
-            appointment.EstimatedEndTime = appointment.RequestedStartTime.AddMinutes(totalMinutes);
+            // 2. The Smart Database Check
+            // We check if ANY appointment exists for this exact time that is either:
+            // - Fully Approved
+            // - Under Review (Paid, waiting for Auntie)
+            // - Pending, BUT created less than 15 minutes ago (Holding the slot)
+            var isSlotTaken = await _context.Appointments
+                .AnyAsync(a =>
+                    a.RequestedStartTime == newAppointment.RequestedStartTime &&
+                    (
+                        a.Status == "Approved" ||
+                        a.Status == "Payment Under Review" ||
+                        (a.Status == "Pending" && a.CreatedAt >= expirationTime)
+                    )
+                );
 
-            bool isClashing = await _appointmentRepo.HasOverlappingAppointmentsAsync(appointment.RequestedStartTime, appointment.EstimatedEndTime);
-            if (isClashing) throw new Exception("Sorry, Auntie is already booked for this time!");
+            // 3. Block the Double Booking!
+            if (isSlotTaken)
+            {
+                throw new Exception("Sorry! This time slot is currently locked by another customer. Please choose a different time or try again in 15 minutes.");
+            }
 
-            // Default to Awaiting Payment
-            appointment.Status = "Awaiting Payment";
+            // 4. If the coast is clear, save the new appointment as 'Pending'
+            newAppointment.Status = "Pending";
+            newAppointment.CreatedAt = DateTime.Now;
 
-            await _appointmentRepo.AddAsync(appointment);
-            await _appointmentRepo.SaveChangesAsync();
-            return appointment;
+            _context.Appointments.Add(newAppointment);
+            await _context.SaveChangesAsync();
+
+            return newAppointment;
         }
 
         public async Task<string> UploadReceiptAsync(int appointmentId, IFormFile file)
@@ -87,6 +105,18 @@ namespace ParlorBookingSystem.Services
                 throw new Exception("You can only confirm appointments that have uploaded a deposit receipt.");
 
             // Change the status to lock it in permanently
+            appointment.Status = "Confirmed";
+
+            await _appointmentRepo.SaveChangesAsync();
+
+            return appointment;
+        }
+        public async Task<Appointment> RejectAppointmentAsync(int appointmentId)
+        {
+            var appointment = await _appointmentRepo.GetByIdAsync(appointmentId);
+            if (appointment == null)
+                throw new Exception("Appointment not found.");
+
             appointment.Status = "Confirmed";
 
             await _appointmentRepo.SaveChangesAsync();

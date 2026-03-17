@@ -1,18 +1,18 @@
-﻿using Microsoft.EntityFrameworkCore;
-using ParlorBookingSystem.Models; // Make sure this using statement is at the top!
+﻿using Microsoft.AspNetCore.Identity;
+using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore;
+using ParlorBookingSystem.Models;
 
-namespace ParlorBookingSystem.Data // Your namespace might be slightly different, that is okay
+namespace ParlorBookingSystem.Data
 {
-    public class ApplicationDbContext : DbContext
+    public class ApplicationDbContext : IdentityDbContext<IdentityUser>
     {
-        public ApplicationDbContext(DbContextOptions<ApplicationDbContext> options)
-            : base(options)
+        public ApplicationDbContext(DbContextOptions<ApplicationDbContext> options) : base(options)
         {
         }
 
-        // These three lines are the crucial part!
-        // They tell EF Core to turn our C# Models into SQL Tables.
-        public DbSet<User> Users { get; set; }
+        // Just ONE Users property here, using 'new' to avoid the warning
+        public new DbSet<ParlorBookingSystem.Models.User> Users { get; set; }
         public DbSet<Service> Services { get; set; }
         public DbSet<Appointment> Appointments { get; set; }
     }

@@ -2,8 +2,9 @@
 using Microsoft.AspNetCore.Http;
 using ParlorBookingSystem.Models;
 using ParlorBookingSystem.Services;
-
+using Microsoft.AspNetCore.Authorization;
 namespace ParlorBookingSystem.Controllers
+
 {
     [Route("api/[controller]")]
     [ApiController]
@@ -57,6 +58,7 @@ namespace ParlorBookingSystem.Controllers
 
         // --- 3. THE AUNTIE SIDE: View Inbox ---
         // GET: api/Appointments/review
+        [Authorize(Roles = "Admin")]
         [HttpGet("review")]
         public async Task<IActionResult> GetAppointmentsForReview()
         {
@@ -66,6 +68,7 @@ namespace ParlorBookingSystem.Controllers
 
         // --- 4. THE AUNTIE SIDE: Accept an Appointment ---
         // PUT: api/Appointments/5/confirm
+        [Authorize(Roles = "Admin")]
         [HttpPut("{id}/confirm")]
         public async Task<IActionResult> ConfirmAppointment(int id)
         {
@@ -76,7 +79,10 @@ namespace ParlorBookingSystem.Controllers
 
                 // 2. Draft the automated email
                 // IMPORTANT: Put your actual email here for testing!
-                string targetEmail = "YOUR_PERSONAL_EMAIL_HERE@gmail.com";
+                // Use the email of the person who actually booked the appointment!
+                // Just for testing, use a hardcoded string until we fix the Model relationship
+                // Use '.Customer' because that is the name in your Appointment model!
+                string targetEmail = confirmedAppointment.Customer?.Email ?? "ekobmln1@gmail.com";
                 string subject = "Appointment Confirmed - Auntie's Parlor";
 
                 string body = $@"
@@ -92,6 +98,42 @@ namespace ParlorBookingSystem.Controllers
                 {
                     Message = "Appointment CONFIRMED and Email Sent successfully!",
                     Appointment = confirmedAppointment
+                });
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(new { Error = ex.Message });
+            }
+        }
+
+        // --- 5. THE AUNTIE SIDE: Reject an Appointment ---
+        // PUT: api/Appointments/5/reject
+        [Authorize(Roles = "Admin")]
+        [HttpPut("{id}/reject")]
+        public async Task<IActionResult> RejectAppointment(int id)
+        {
+            try
+            {
+                // 1. Update the database 
+                // (Note: Make sure RejectAppointmentAsync exists in your AppointmentService!)
+                var rejectedAppointment = await _appointmentService.RejectAppointmentAsync(id);
+
+                // 2. Draft the apology email
+                string targetEmail = rejectedAppointment.Customer?.Email ?? "ekobmln1@gmail.com";
+                string subject = "Appointment Update - Auntie's Parlor";
+
+                string body = $@"
+                    <h2>Hello {rejectedAppointment.Customer?.FullName ?? "there"},</h2>
+                    <p>We are sorry, but Auntie cannot accommodate your appointment request for <strong>{rejectedAppointment.RequestedStartTime:f}</strong> at this time.</p>
+                    <p>If you sent a deposit, we will initiate a refund shortly. Please message the page to reschedule!</p>";
+
+                // 3. Fire the email
+                await _emailService.SendEmailAsync(targetEmail, subject, body);
+
+                return Ok(new
+                {
+                    Message = "Appointment REJECTED and Email Sent successfully!",
+                    Appointment = rejectedAppointment
                 });
             }
             catch (Exception ex)

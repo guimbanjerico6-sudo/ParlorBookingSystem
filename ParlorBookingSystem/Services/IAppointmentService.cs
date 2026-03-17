@@ -10,5 +10,7 @@ namespace ParlorBookingSystem.Services
         Task<string> UploadReceiptAsync(int appointmentId, IFormFile file);
         Task<IEnumerable<Appointment>> GetAppointmentsForReviewAsync();
         Task<Appointment> ConfirmAppointmentAsync(int appointmentId);
+        Task<Appointment> RejectAppointmentAsync(int appointmentId);
+
     }
 }
